@@ -35,3 +35,5 @@ set_source_files_properties(${mode_src} PROPERTIES COMPILE_FLAGS
 
 add_library(otto_gif_mode MODULE ${mode_src})
 target_link_libraries(otto_gif_mode otto_gfx entityx)
+
+file(COPY "assets" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
