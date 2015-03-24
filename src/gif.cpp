@@ -1,4 +1,4 @@
-#include "stak.h"
+#include "otto.h"
 #include "gfx.hpp"
 
 #include "entityx/entityx.h"
@@ -8,6 +8,11 @@
 // Debug
 #include <iostream>
 #include <string>
+
+#define BASE_DIRECTORY "/home/pi"
+#define FASTCAMD_DIR BASE_DIRECTORY "/otto-sdk/fastcmd/"
+#define GIF_TEMP_DIR BASE_DIRECTORY "/gif_temp/"
+#define OUTPUT_DIR BASE_DIRECTORY "/output/"
 
 using namespace otto;
 
@@ -23,18 +28,60 @@ struct GifModeData {
 } mode;
 
 STAK_EXPORT int init() {
-  loadFont(std::string(stak_assets_path()) + "232MKSD-round-medium.ttf");
+  loadFont(std::string(otto_assets_path()) + "232MKSD-round-medium.ttf");
   std::cout << "gif loaded" << std::endl;
 
+  startCamera();
   return 0;
 }
 
 STAK_EXPORT int shutdown() {
+  stopCamera();
   return 0;
 }
 
 STAK_EXPORT int update(float dt) {
   return 0;
+}
+
+static void startCamera() {
+  ottoSystemCallProcess( "mkdir -p " GIF_TEMP_DIR );
+  ottoSystemCallProcess( "mkdir -p " OUTPUT_DIR );
+  ottoSystemCallProcess( FASTCAMD_DIR "start_camd.sh");
+}
+static void stopCamera() {
+  if( pthread_join( pthr_process_gif, NULL ) ) {
+    fprintf(stderr, "Error joining gif process thread\n");
+  }
+  ottoSystemCallProcess( FASTCAMD_DIR "stop_camd.sh");
+  ottoSystemCallProcess("rm -Rf " GIF_TEMP_DIR);
+}
+static void captureFrame() {
+  ottoSystemCallProcess( FASTCAMD_DIR "do_capture.sh" )
+}
+
+// runs gifsicle to process gifs
+static void* thread_process_gif(void* arg) {
+    static char system_call_string[1024];
+
+    is_processing_gif = 1;
+    
+    // return the number to use for the next image file
+    int file_number = get_next_file_number();
+
+    beep(512, 30);
+    nanosleep((struct timespec[]){{0, 200000000L}}, NULL);
+    beep(512, 30);
+
+    // create system call string based on calculated file number
+    sprintf( system_call_string, "gifsicle --colors 256 " GIF_TEMP_DIR "*.gif > " OUTPUT_DIR "gif_%04i.gif ; rm " GIF_TEMP_DIR "* ; chown pi:pi " OUTPUT_DIR "$FNAME", file_number );
+
+    // run processing call
+    system( system_call_string );
+
+    is_processing_gif = 0;
+
+    beep(256, 30);
 }
 
 static void drawFrameNumber() {
@@ -89,7 +136,7 @@ STAK_EXPORT int draw() {
   setTransform(defaultMatrix);
 
   // NOTE(ryan): Apply a circular mask to simulate a round display. We may want to move this to
-  // stak-sdk so that the mask is enforced.
+  // otto-sdk so that the mask is enforced.
   fillMask(0, 0, screenWidth, screenHeight);
   beginPath();
   circle(48.0f, 48.0f, 48.0f);
@@ -144,10 +191,14 @@ STAK_EXPORT int crank_rotated(int amount) {
   mode.currentFrame =
       std::max<float>(mode.minFrame, std::min<float>(mode.maxFrame, mode.currentFrame));
 
+
+  captureFrame();
+
   return 0;
 }
 
 STAK_EXPORT int shutter_button_pressed() {
+  captureFrame();
   return 0;
 }
 
