@@ -10,3 +10,6 @@
 [submodule "deps/entityx"]
 	path = deps/entityx
 	url = https://github.com/alecthomas/entityx.git
+[submodule "deps/libOttoHardware"]
+	path = deps/libOttoHardware
+	url = git@github.com:NextThingCo/libOttoHardware.git
