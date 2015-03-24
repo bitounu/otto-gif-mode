@@ -9,10 +9,18 @@
 #include <iostream>
 #include <string>
 
+
+#include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #define BASE_DIRECTORY "/home/pi"
 #define FASTCAMD_DIR BASE_DIRECTORY "/otto-sdk/fastcmd/"
 #define GIF_TEMP_DIR BASE_DIRECTORY "/gif_temp/"
 #define OUTPUT_DIR BASE_DIRECTORY "/output/"
+
+volatile int is_processing_gif = 0;
+pthread_t pthr_process_gif;
 
 using namespace otto;
 
@@ -44,6 +52,28 @@ STAK_EXPORT int update(float dt) {
   return 0;
 }
 
+static int get_next_file_number() {
+    DIR *dirp;
+    struct dirent *dp;
+    int highest_number = 0;
+
+    dirp = opendir( OUTPUT_DIR );
+    while ((dp = readdir(dirp)) != NULL) {
+        char num_buffer[5];
+        char * pos = strstr ( dp->d_name, ".gif" );
+        int offset = (int) ( pos - dp->d_name );
+        int len = strlen( dp->d_name );
+        if ( ( pos ) &&
+             ( pos > dp->d_name + 4) &&
+             ( offset == ( len - 4 ) ) ) {
+            strncpy( num_buffer, pos - 4, 4 );
+            int number = atoi( num_buffer ) + 1;
+            if( number > highest_number ) highest_number = number;
+        }
+    }
+    closedir(dirp);
+    return highest_number;
+}
 static void startCamera() {
   ottoSystemCallProcess( "mkdir -p " GIF_TEMP_DIR );
   ottoSystemCallProcess( "mkdir -p " OUTPUT_DIR );
@@ -69,15 +99,11 @@ static void* thread_process_gif(void* arg) {
     // return the number to use for the next image file
     int file_number = get_next_file_number();
 
-    beep(512, 30);
-    nanosleep((struct timespec[]){{0, 200000000L}}, NULL);
-    beep(512, 30);
-
     // create system call string based on calculated file number
     sprintf( system_call_string, "gifsicle --colors 256 " GIF_TEMP_DIR "*.gif > " OUTPUT_DIR "gif_%04i.gif ; rm " GIF_TEMP_DIR "* ; chown pi:pi " OUTPUT_DIR "$FNAME", file_number );
 
     // run processing call
-    system( system_call_string );
+    ottoSystemCallProcess( system_call_string );
 
     is_processing_gif = 0;
 
