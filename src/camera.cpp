@@ -6,16 +6,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <future>
 
-#define BASE_DIRECTORY "/home/pi"
-#define FASTCAMD_DIR BASE_DIRECTORY "/otto-sdk/fastcmd/"
+#define BASE_DIRECTORY "/stak/user"
+#define FASTCAMD_DIR "/stak/sdk/otto-sdk/fastcmd/"
 #define GIF_TEMP_DIR BASE_DIRECTORY "/gif_temp/"
 #define OUTPUT_DIR BASE_DIRECTORY "/output/"
 
 namespace otto {
+int num_frames = 0;
 
-volatile int is_processing_gif = 0;
-pthread_t pthr_process_gif;
+std::future<void> gifProcessorFuture;
 
 static int get_next_file_number() {
   DIR *dirp;
@@ -45,36 +46,42 @@ void startCamera() {
 }
 
 void stopCamera() {
-  if (pthread_join(pthr_process_gif, NULL)) {
-    fprintf(stderr, "Error joining gif process thread\n");
-  }
+  
+  if( isProcessingGif() ) gifProcessorFuture.wait();
   ottoSystemCallProcess(FASTCAMD_DIR "stop_camd.sh");
   ottoSystemCallProcess("rm -Rf " GIF_TEMP_DIR);
 }
 
 void captureFrame() {
-  ottoSystemCallProcess(FASTCAMD_DIR "do_capture.sh")
+  
+  if( isProcessingGif() ) return;
+
+  ottoSystemCallProcess(FASTCAMD_DIR "do_capture.sh");
+  num_frames++;
+  if( num_frames >= 30 ) createFinalGif();
 }
 
-// runs gifsicle to process gifs
-static void *thread_process_gif(void *arg) {
-  static char system_call_string[1024];
+void createFinalGif() {
+  // this shouldn't ever happen anyways.
+  if( isProcessingGif() ) return;
+  gifProcessorFuture = std::async(std::launch::async, [](){
+    static char system_call_string[1024];
 
-  is_processing_gif = 1;
+    // return the number to use for the next image file
+    int file_number = get_next_file_number();
 
-  // return the number to use for the next image file
-  int file_number = get_next_file_number();
+    // create system call string based on calculated file number
+    sprintf(system_call_string,
+      "gifsicle --colors 256 " GIF_TEMP_DIR "*.gif > " OUTPUT_DIR
+      "gif_%04i.gif ; rm " GIF_TEMP_DIR "* ; chown pi:pi " OUTPUT_DIR "$FNAME",
+      file_number);
 
-  // create system call string based on calculated file number
-  sprintf(system_call_string,
-          "gifsicle --colors 256 " GIF_TEMP_DIR "*.gif > " OUTPUT_DIR
-          "gif_%04i.gif ; rm " GIF_TEMP_DIR "* ; chown pi:pi " OUTPUT_DIR "$FNAME",
-          file_number);
-
-  // run processing call
-  ottoSystemCallProcess(system_call_string);
-
-  is_processing_gif = 0;
+    // run processing call
+    ottoSystemCallProcess(system_call_string);
+  });
+}
+int isProcessingGif() {
+  return ( gifProcessorFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready );
 }
 
 } // otto
