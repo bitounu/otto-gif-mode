@@ -115,31 +115,21 @@ static void rewind(float amount) {
 }
 
 STAK_EXPORT int crank_rotated(int amount) {
-  if (amount > 0)
-    captureFrame();
-  else if (amount < 0 && mode.nextFrame > mode.maxFrame)
-    rewind(std::abs(amount) * 0.02f);
-  display.wake();
+  if (!display.wake()) {
+    if (amount > 0)
+      captureFrame();
+    else if (amount < 0 && mode.nextFrame > mode.maxFrame)
+      rewind(std::abs(amount) * 0.02f);
+  }
   return 0;
 }
 
 STAK_EXPORT int shutter_button_pressed() {
-  captureFrame();
-  display.wake();
+  if (!display.wake()) captureFrame();
   return 0;
 }
 
 STAK_EXPORT int shutter_button_released() {
-  display.wake();
-  return 0;
-}
-
-STAK_EXPORT int power_button_pressed() {
-  display.wake();
-  return 0;
-}
-
-STAK_EXPORT int power_button_released() {
   display.wake();
   return 0;
 }
