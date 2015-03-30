@@ -3,10 +3,10 @@ project(otto_gif_mode)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(OTTO_GFX   "deps/otto-gfx")
-set(OTTO_SDK   "deps/otto-sdk")
-set(OTTO_UTILS "deps/otto-utils")
-set(ENTITYX    "deps/entityx")
+set(OTTO_GFX    "deps/otto-gfx")
+set(OTTO_RUNNER "deps/otto-runner")
+set(OTTO_UTILS  "deps/otto-utils")
+set(ENTITYX     "deps/entityx")
 
 add_subdirectory(${OTTO_GFX})
 
@@ -21,7 +21,7 @@ include_directories(
   ${OTTO_GFX}/deps/nanosvg/src
   ${OTTO_GFX}/deps/glm/glm
   ${OTTO_GFX}/src
-  ${OTTO_SDK}/src
+  ${OTTO_RUNNER}/src
   ${OTTO_UTILS}/src
   lib)
 
