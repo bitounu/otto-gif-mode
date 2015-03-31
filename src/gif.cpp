@@ -33,6 +33,9 @@ static struct {
 
   Output<vec3> flashColor;
 
+  bool isFull() { return nextFrame > maxFrame; }
+  bool isEmpty() { return nextFrame == minFrame; }
+
   void save() {
     rewindAmount = 0.0f;
     nextFrame = minFrame;
@@ -43,15 +46,13 @@ static struct {
                                         colorBGR(0xFFF100) };
     static size_t colorIndex = 0;
 
-    if (nextFrame <= maxFrame) {
-      nextFrame++;
-      colorIndex = (colorIndex + 1) % 3;
-      timeline.apply(&flashColor)
-          .then<Hold>(flashColors[colorIndex], 0.0f)
-          .then<RampTo>(vec3(), 0.3f, EaseOutQuad());
-    } else if (!isRewinding) {
-      rewind(0.05f);
-    }
+    nextFrame++;
+    colorIndex = (colorIndex + 1) % 3;
+    timeline.apply(&flashColor)
+        .then<Hold>(flashColors[colorIndex], 0.0f)
+        .then<RampTo>(vec3(), 0.3f, EaseOutQuad());
+
+    if (isFull()) rewind(rewindAmountMin);
   }
 
   void startRewinding() {
@@ -68,14 +69,34 @@ static struct {
 
   void rewind(float amount) {
     if (!isRewinding) startRewinding();
-    rewindAmount = std::min(1.0f, rewindAmount + amount);
+
+    // Bounce the meter to indicate that cancelling a rewind is impossible when the reel is full.
+    if (amount < 0.0f && isFull()) {
+      if (!rewindMeterAmount.isConnected()) {
+        timeline.apply(&rewindMeterAmount)
+            .then<RampTo>(std::max(0.0f, rewindAmount - 0.05f), 0.09f, EaseOutQuad())
+            .then<RampTo>(rewindAmount, 0.09f, EaseInQuad());
+      }
+      return;
+    }
+
+    rewindAmount = clamp(rewindAmount + amount, 0.0f, 1.0f);
     timeline.apply(&rewindMeterAmount).then<RampTo>(rewindAmount, 0.05f);
-    if (rewindAmount > 0.99f) {
+
+    if (rewindAmount < rewindAmountMin) {
+      stopRewinding();
+    } else if (rewindAmount > 0.99f) {
       save();
       stopRewinding();
     }
   }
 
+  void wind(float amount) {
+    if (amount < 0.0f && !isEmpty())
+      startRewinding();
+    else
+      captureFrame();
+  }
 } mode;
 
 STAK_EXPORT int init() {
@@ -105,9 +126,11 @@ STAK_EXPORT int draw() {
       ScopedTransform xf;
       translate(0, -11);
 
-      uint32_t frameNum = mode.isRewinding ? map(mode.rewindAmount, mode.rewindAmountMin, 1.0f,
-                                                 mode.maxFrame, mode.minFrame)
-                                           : mode.nextFrame;
+      uint32_t frameNum = mode.nextFrame;
+      if (mode.isRewinding) {
+        frameNum = map(mode.rewindAmount, mode.rewindAmountMin, 1.0f,
+                       std::min(mode.maxFrame, mode.nextFrame), mode.minFrame);
+      }
 
       fontSize(40);
       textAlign(ALIGN_CENTER | ALIGN_BASELINE);
@@ -121,6 +144,7 @@ STAK_EXPORT int draw() {
         lineTo(0, -3);
         lineTo(15, 3);
         strokeWidth(2);
+        strokeCap(VG_CAP_ROUND);
         strokeColor(vec4(1, 1, 1, 0.35f));
         stroke();
       }
@@ -137,8 +161,9 @@ STAK_EXPORT int draw() {
       }
     }
 
+    // Rewinding
     if (mode.rewindMeterOpacity > 0.0f) {
-      float r = display.bounds.size.x * 0.5f - 6.0f;
+      float r = display.bounds.size.x * 0.5f - 8.0f;
       float a = halfPi + mode.rewindMeterAmount() * twoPi;
 
       auto color = vec4(colorBGR(0xEC008B), mode.rewindMeterOpacity());
@@ -173,17 +198,10 @@ STAK_EXPORT int draw() {
 
 STAK_EXPORT int crank_rotated(int amount) {
   if (!display.wake()) {
-    if (amount > 0) {
-      if (!mode.isRewinding) {
-        mode.captureFrame();
-      } else if (!mode.rewindMeterAmount.isConnected()) {
-        timeline.apply(&mode.rewindMeterAmount)
-            .then<RampTo>(std::max(0.0f, mode.rewindAmount - 0.05f), 0.09f, EaseOutQuad())
-            .then<RampTo>(mode.rewindAmount, 0.09f, EaseInQuad());
-      }
-    } else if (amount < 0 && (mode.isRewinding || mode.nextFrame > mode.minFrame)) {
-      mode.rewind(mode.rewindAmountMin);
-    }
+    if (mode.isRewinding)
+      mode.rewind(amount * -0.05f);
+    else
+      mode.wind(amount);
   }
   return 0;
 }
