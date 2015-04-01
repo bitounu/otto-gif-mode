@@ -37,6 +37,9 @@ static struct {
 
   Output<vec3> flashColor;
 
+  Output<float> captureScreenScale = 1.0f;
+  Output<float> saveScreenScale = 0.0f;
+
   std::chrono::steady_clock::time_point lastFrameChangeTime;
 
   Svg *iconRewind;
@@ -48,20 +51,38 @@ static struct {
   bool isFull() { return nextFrame > maxFrame; }
   bool isEmpty() { return nextFrame == minFrame; }
 
-  void save() {
-    rewindAmount = 0.0f;
-    nextFrame = minFrame;
-  }
-
-  void setMeterFrame(uint32_t frame) {
+  void setMeterFrame(uint32_t frame, bool immediate = false) {
     auto now = std::chrono::steady_clock::now();
     auto timeSinceLastFrame =
         std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFrameChangeTime).count();
     lastFrameChangeTime = now;
 
     // Tween to the next frame
-    float duration = timeSinceLastFrame < 200.0f ? 0.0f : 0.33f;
+    float duration = (immediate || timeSinceLastFrame < 300.0f) ? 0.0f : 0.33f;
     timeline.apply(&frameMeterValue).then<RampTo>(frame, duration, EaseOutQuad());
+  }
+
+  void save() {
+    timeline.apply(&captureScreenScale).then<RampTo>(0.0f, 0.15f, EaseInQuad());
+    timeline.apply(&saveScreenScale)
+        .then<Hold>(0.0f, 0.15f)
+        .then<RampTo>(1.0f, 0.15f, EaseOutQuad());
+
+    // TODO(ryan): Replace this with actual saving / GIF creation.
+    timeline.cue([this] { completeSave(); }, 2.0f);
+  }
+
+  void completeSave() {
+    rewindAmount = 0.0f;
+    nextFrame = minFrame;
+
+    setMeterFrame(minFrame, true);
+
+    timeline.apply(&saveScreenScale).then<RampTo>(0.0f, 0.15f, EaseInQuad());
+    timeline.apply(&captureScreenScale)
+        .then<Hold>(0.0f, 0.15f)
+        .then<RampTo>(1.0f, 0.15f, EaseOutQuad());
+
   }
 
   void captureFrame() {
@@ -71,11 +92,10 @@ static struct {
 
     if (isFull()) {
       // NOTE(ryan): Bounce the meter to indicate the reel is full
-      // if (!frameMeterValue.isConnected())
-        timeline.apply(&frameMeterValue)
-            .then<RampTo>(maxFrame + 1.15f, 0.1f, EaseOutQuad())
-            .then<RampTo>(maxFrame + 1, 0.2f, EaseInQuad());
-        return;
+      timeline.apply(&frameMeterValue)
+          .then<RampTo>(maxFrame + 1.15f, 0.1f, EaseOutQuad())
+          .then<RampTo>(maxFrame + 1, 0.2f, EaseInQuad());
+      return;
     }
 
     setMeterFrame(++nextFrame);
@@ -87,25 +107,11 @@ static struct {
         .then<RampTo>(vec3(), 0.3f, EaseOutQuad());
   }
 
-  void startRewinding() {
-    isRewinding = true;
-    rewindAmount = 0.0f;
-    timeline.apply(&rewindMeterAmount).then<Hold>(0.0f, 0.0f);
-    timeline.apply(&rewindMeterOpacity).then<RampTo>(1.0f, 0.25f, EaseOutQuad());
-  }
-
-  void stopRewinding() {
-    isRewinding = false;
-    timeline.apply(&rewindMeterOpacity).then<RampTo>(0.0f, 0.25f, EaseInQuad());
-  }
-
   void rewind(float amount) {
-    if (!isRewinding) startRewinding();
-
-    rewindAmount = clamp(rewindAmount + amount, rewindAmountMin, 1.0f);
+    rewindAmount = clamp(rewindAmount + amount, 0.0f, 1.0f);
     timeline.apply(&rewindMeterAmount).then<RampTo>(rewindAmount, 0.05f);
 
-    setMeterFrame(map(rewindAmount, rewindAmountMin, 1.0f, nextFrame, minFrame));
+    setMeterFrame(nextFrame - 1);//map(rewindAmount, 0.0f, 1.0f, nextFrame, minFrame));
 
     if (rewindAmount < rewindAmountMin) {
       stopRewinding();
@@ -113,6 +119,19 @@ static struct {
       save();
       stopRewinding();
     }
+  }
+
+  void startRewinding() {
+    isRewinding = true;
+    rewindAmount = 0.0f;
+    timeline.apply(&rewindMeterAmount).then<Hold>(0.0f, 0.0f);
+    timeline.apply(&rewindMeterOpacity).then<RampTo>(1.0f, 0.25f, EaseOutQuad());
+    rewind(0.05f);
+  }
+
+  void stopRewinding() {
+    isRewinding = false;
+    timeline.apply(&rewindMeterOpacity).then<RampTo>(0.0f, 0.25f, EaseInQuad());
   }
 
   void wind(float amount) {
@@ -142,13 +161,16 @@ static struct {
       rotate(angle);
       translate(0, frameMeterRadius);
 
+      float brightness = 1.0f - std::abs(angle) / frameMeterAngleIncr;
+      ScopedColorTransform ct(vec4(vec3(1.0f), brightness), vec4(0.0f));
+
       if (frame + i == maxFrame + 1) {
         translate(0, 17);
         rotate(std::min(0.0f, frameAngle) * -5.0f);
         drawSvg(iconRewind);
       }
       else {
-        fillColor(1, 1, 1, 1.0f - std::abs(angle) / frameMeterAngleIncr);
+        fillColor(vec3(1));
         fillText(std::to_string(frame + i));
       }
     }
@@ -185,7 +207,7 @@ static struct {
     fill();
   }
 
-  void draw() {
+  void drawCaptureScreen() {
     beginPath();
     rect(display.bounds.size * -0.5f, display.bounds.size);
     fillColor(flashColor());
@@ -193,36 +215,43 @@ static struct {
 
     drawFrameMeter();
 
-    {
-      ScopedTransform xf;
-      translate(0, -11);
-
-      if (!isRewinding) {
-        beginPath();
-        moveTo(-15, -3);
-        lineTo(0, 3);
-        lineTo(0, -3);
-        lineTo(15, 3);
-        strokeWidth(2);
-        strokeCap(VG_CAP_ROUND);
-        strokeColor(vec4(1, 1, 1, 0.35f));
-        stroke();
-      }
-
-      fillColor(vec4(1, 1, 1, 0.35f));
-      if (isRewinding) {
-        fontSize(16);
-        textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
-        fillText("rewind", 0, -4);
-      } else {
-        fontSize(20);
-        textAlign(ALIGN_CENTER | ALIGN_TOP);
-        fillText(std::to_string(maxFrame), 0, -5);
-      }
-    }
-
     // Rewinding
     if (rewindMeterOpacity > 0.0f) drawRewindMeter();
+
+    translate(0, -11);
+
+    beginPath();
+    moveTo(-15, -3);
+    lineTo(0, 3);
+    lineTo(0, -3);
+    lineTo(15, 3);
+    strokeWidth(2);
+    strokeCap(VG_CAP_ROUND);
+    strokeColor(vec4(1, 1, 1, 0.35f));
+    stroke();
+
+    fillColor(vec4(1, 1, 1, 0.35f));
+    fontSize(20);
+    textAlign(ALIGN_CENTER | ALIGN_TOP);
+    fillText(std::to_string(maxFrame), 0, -5);
+  }
+
+  void drawSaveScreen() {
+    fontSize(20);
+    textAlign(ALIGN_CENTER | ALIGN_MIDDLE);
+    fillColor(vec3(1));
+    fillText("saving");
+  }
+
+  void draw() {
+    if (captureScreenScale() > 0.0f) {
+      scale(captureScreenScale());
+      drawCaptureScreen();
+    }
+    else if (saveScreenScale() > 0.0f) {
+      scale(saveScreenScale());
+      drawSaveScreen();
+    }
   }
 } mode;
 
@@ -250,7 +279,7 @@ STAK_EXPORT int draw() {
 }
 
 STAK_EXPORT int crank_rotated(int amount) {
-  if (!display.wake()) {
+  if (!display.wake() && mode.captureScreenScale() == 1.0f) {
     if (mode.isRewinding)
       mode.rewind(amount * -0.05f);
     else
