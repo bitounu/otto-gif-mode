@@ -40,4 +40,11 @@ set_source_files_properties(${mode_src} PROPERTIES COMPILE_FLAGS
 add_library(otto_gif_mode MODULE ${mode_src})
 target_link_libraries(otto_gif_mode otto_gfx entityx)
 
-file(COPY "assets" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# Copy assets to the build directory
+add_custom_command(
+  OUTPUT ${CMAKE_BINARY_DIR}/assets
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
+  DEPENDS ${CMAKE_SOURCE_DIR}/assets
+  COMMENT "Copying assets")
+add_custom_target(otto_gif_assets ALL DEPENDS ${CMAKE_BINARY_DIR}/assets)
+add_dependencies(otto_gif_mode otto_gif_assets)
