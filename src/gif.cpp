@@ -102,8 +102,10 @@ static struct {
   void rewind(float amount) {
     if (!isRewinding) startRewinding();
 
-    rewindAmount = clamp(rewindAmount + amount, 0.0f, 1.0f);
+    rewindAmount = clamp(rewindAmount + amount, rewindAmountMin, 1.0f);
     timeline.apply(&rewindMeterAmount).then<RampTo>(rewindAmount, 0.05f);
+
+    setMeterFrame(map(rewindAmount, rewindAmountMin, 1.0f, nextFrame, minFrame));
 
     if (rewindAmount < rewindAmountMin) {
       stopRewinding();
