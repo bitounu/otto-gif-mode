@@ -52,6 +52,9 @@ static struct {
   bool isEmpty() { return nextFrame == minFrame; }
 
   void setMeterFrame(uint32_t frame, bool immediate = false) {
+    // NOTE(ryan): Bail if the value is the same to avoid resetting the last frame timer.
+    if (frameMeterValue() == frame) return;
+
     auto now = std::chrono::steady_clock::now();
     auto timeSinceLastFrame =
         std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFrameChangeTime).count();
@@ -82,7 +85,6 @@ static struct {
     timeline.apply(&captureScreenScale)
         .then<Hold>(0.0f, 0.15f)
         .then<RampTo>(1.0f, 0.15f, EaseOutQuad());
-
   }
 
   void captureFrame() {
@@ -111,13 +113,14 @@ static struct {
     rewindAmount = clamp(rewindAmount + amount, 0.0f, 1.0f);
     timeline.apply(&rewindMeterAmount).then<RampTo>(rewindAmount, 0.05f);
 
-    setMeterFrame(nextFrame - 1);//map(rewindAmount, 0.0f, 1.0f, nextFrame, minFrame));
-
     if (rewindAmount < rewindAmountMin) {
       stopRewinding();
+      setMeterFrame(nextFrame);
     } else if (rewindAmount > 0.99f) {
       save();
       stopRewinding();
+    } else {
+      setMeterFrame(nextFrame - 1);
     }
   }
 
@@ -289,7 +292,8 @@ STAK_EXPORT int crank_rotated(int amount) {
 }
 
 STAK_EXPORT int shutter_button_pressed() {
-  if (!display.wake() && !mode.isRewinding) mode.captureFrame();
+  if (!display.wake() && !mode.isRewinding && mode.captureScreenScale() == 1.0f)
+    mode.captureFrame();
   return 0;
 }
 
