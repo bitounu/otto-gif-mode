@@ -2,9 +2,8 @@
 #include "gfx.hpp"
 #include "display.hpp"
 #include "timeline.hpp"
-#include "util.hpp"
-
-#include "gtx/rotate_vector.hpp"
+#include "math.hpp"
+#include "draw.hpp"
 
 #include <iostream>
 #include <string>
@@ -12,10 +11,6 @@
 
 using namespace otto;
 using namespace choreograph;
-
-static const float pi = M_PI;
-static const float twoPi = M_PI * 2.0f;
-static const float halfPi = M_PI / 2.0f;
 
 static Display display = { { 96.0f, 96.0f } };
 
@@ -30,7 +25,7 @@ static struct {
 
   Output<float> frameMeterValue = nextFrame;
   const float frameMeterRadius = 100.0f;
-  const float frameMeterAngleIncr = pi / 6.0f;
+  const float frameMeterAngleIncr = otto::PI / 6.0f;
 
   Output<float> rewindMeterAmount = 0.0f;
   Output<float> rewindMeterOpacity = 0.0f;
@@ -180,34 +175,8 @@ static struct {
   }
 
   void drawRewindMeter() {
-    float r = display.bounds.size.x * 0.5f - 8.0f;
-    float a = halfPi + rewindMeterAmount() * twoPi;
-
-    auto color = vec4(colorBGR(0xEC008B), rewindMeterOpacity());
-
-    ScopedMask mask(display.bounds.size);
-    ScopedFillRule fr(VG_NON_ZERO);
-    beginMask();
-
-    beginPath();
-    arc(vec2(), vec2(r * 2.0f), a, halfPi);
-    strokeWidth(3.0f);
-    strokeCap(VG_CAP_BUTT);
-    strokeColor(color);
-    stroke();
-
-    beginPath();
-    circle(0, r, 3);
-    circle(glm::rotate(vec2(r, 0), a), 3);
-    fillColor(color);
-    fill();
-
-    endMask();
-
-    beginPath();
-    rect(display.bounds.size * -0.5f, display.bounds.size);
-    fillColor(color);
-    fill();
+    fillColor(vec4(colorBGR(0xEC008B), rewindMeterOpacity()));
+    drawProgressArc(display, rewindMeterAmount());
   }
 
   void drawCaptureScreen() {
