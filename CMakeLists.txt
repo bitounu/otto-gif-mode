@@ -25,7 +25,7 @@ include_directories(
   ${OTTO_UTILS}/src
   lib)
 
-include_directories(SYSTEM "/opt/vc/include") # VideoCore
+include_directories(SYSTEM "${VC_SDK}/include") # VideoCore
 
 file(GLOB deps_src
   "deps/Choreograph/src/choreograph/*.cpp"
