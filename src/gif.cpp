@@ -1,5 +1,5 @@
 #include "stak.h"
-#include "gfx.hpp"
+#include "otto-gfx/gfx.hpp"
 #include "display.hpp"
 #include "timeline.hpp"
 #include "math.hpp"
@@ -8,11 +8,37 @@
 #include <iostream>
 #include <string>
 #include <chrono>
+#include <dirent.h>
+#include <signal.h>
+#include <cstring>
 
 using namespace otto;
 using namespace choreograph;
 
 static Display display = { { 96.0f, 96.0f } };
+
+int get_next_file_number() {
+    DIR *dirp;
+    struct dirent *dp;
+    int highest_number = 0;
+
+    dirp = opendir( "/mnt/pictures" );
+    while ((dp = readdir(dirp)) != NULL) {
+        char num_buffer[5];
+        char * pos = strstr ( dp->d_name, ".gif" );
+        int offset = (int) ( pos - dp->d_name );
+        int len = strlen( dp->d_name );
+        if ( ( pos ) &&
+             ( pos > dp->d_name + 4) &&
+             ( offset == ( len - 4 ) ) ) {
+            strncpy( num_buffer, pos - 4, 4 );
+            int number = atoi( num_buffer ) + 1;
+            if( number > highest_number ) highest_number = number;
+        }
+    }
+    closedir(dirp);
+    return highest_number;
+}
 
 static struct {
   uint32_t minFrame = 1;
@@ -61,12 +87,20 @@ static struct {
   }
 
   void save() {
+    static char system_call_string[1024];
+
     timeline.apply(&captureScreenScale).then<RampTo>(0.0f, 0.15f, EaseInQuad());
     timeline.apply(&saveScreenScale)
         .then<Hold>(0.0f, 0.15f)
         .then<RampTo>(1.0f, 0.15f, EaseOutQuad());
 
     // TODO(ryan): Replace this with actual saving / GIF creation.
+    int file_number = get_next_file_number();
+    sprintf( system_call_string, "gifsicle --colors 256 /mnt/tmp/*.gif > /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*", file_number );
+
+    // run processing call
+    system( system_call_string );
+
     timeline.cue([this] { completeSave(); }, 2.0f);
   }
 
@@ -87,7 +121,13 @@ static struct {
                                         colorBGR(0xFFF100) };
     static size_t colorIndex = 0;
 
-    if (isFull()) {
+    if (!isFull()) {
+      int pid = 0;
+      FILE *f = fopen("/var/lock/otto-fastcamd.pid", "r");
+      fscanf(f, "%d", &pid);
+      fclose(f);
+      kill( pid, SIGUSR1 );
+    }else{
       // NOTE(ryan): Bounce the meter to indicate the reel is full
       timeline.apply(&frameMeterValue)
           .then<RampTo>(maxFrame + 1.15f, 0.1f, EaseOutQuad())
