@@ -1,5 +1,5 @@
 #include "stak.h"
-#include "otto-gfx/gfx.hpp"
+#include <otto-gfx/gfx.hpp>
 #include "display.hpp"
 #include "timeline.hpp"
 #include "math.hpp"

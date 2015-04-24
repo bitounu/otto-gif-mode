@@ -17,9 +17,6 @@ add_subdirectory(${ENTITYX})
 include_directories(
   deps/Choreograph/src
   ${ENTITYX}
-  ${OTTO_GFX}/deps/nanosvg/src
-  ${OTTO_GFX}/deps/glm/glm
-  ${OTTO_GFX}/src
   ${OTTO_RUNNER}/src
   ${OTTO_UTILS}/src
   lib)
