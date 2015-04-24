@@ -11,12 +11,59 @@
 #include <dirent.h>
 #include <signal.h>
 #include <cstring>
+#include <regex>
+#include <thread>
+#include <sys/stat.h>
 
 using namespace otto;
 using namespace choreograph;
 
 static Display display = { { 96.0f, 96.0f } };
 
+std::thread saving_thread;
+
+std::vector< std::string > getFilesInDirectory( std::string path, std::string match = "" ) {
+  std::vector< std::string > files_in_directory;
+  auto regex_filter = std::regex ( match );
+  bool perform_regex = ( match.size() != 0 );
+
+  // open directory
+  DIR* directory = opendir( path.c_str( ) );
+
+  if( !directory )
+    throw std::invalid_argument( "invalid path" );
+
+  // start reading nodes
+  struct dirent* directory_entry = readdir( directory );
+
+  // loop while a node is returned
+  while( directory_entry ) {
+
+    // copy file entry name
+    std::string file_entry = std::string( directory_entry->d_name );
+
+    // read next node
+    directory_entry = readdir( directory );
+
+    // exclude '.' and '..' from listing
+    if( ( file_entry == "." ) || ( file_entry == ".." ) )
+      continue;
+
+    // push filename to vector
+    if( !perform_regex || std::regex_search( file_entry, regex_filter ) ) {
+      files_in_directory.push_back( file_entry );
+    }
+  }
+
+  // close directory and return vector of file names
+  closedir( directory );
+  return files_in_directory;
+}
+
+int startProcessingGifs() {
+  //auto gifs = getFilesInDirectory( "/mnt/tmp", ".*\.gif"R );
+  return 0;
+}
 int get_next_file_number() {
     DIR *dirp;
     struct dirent *dp;
@@ -87,7 +134,6 @@ static struct {
   }
 
   void save() {
-    static char system_call_string[1024];
 
     timeline.apply(&captureScreenScale).then<RampTo>(0.0f, 0.15f, EaseInQuad());
     timeline.apply(&saveScreenScale)
@@ -95,16 +141,24 @@ static struct {
         .then<RampTo>(1.0f, 0.15f, EaseOutQuad());
 
     // TODO(ryan): Replace this with actual saving / GIF creation.
-    int file_number = get_next_file_number();
-    sprintf( system_call_string, "gifsicle --colors 256 /mnt/tmp/*.gif > /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*", file_number );
+    auto t = std::thread([] {
+    static char system_call_string[1024];
+      int file_number = get_next_file_number();
+      sprintf( system_call_string, "gifsicle --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*.gif", file_number );
 
-    // run processing call
-    system( system_call_string );
+      // run processing call
+      system( system_call_string );
+    });
+    saving_thread = std::move(t);
 
-    timeline.cue([this] { completeSave(); }, 2.0f);
+
+    timeline.cue([this] { completeSave(); }, 1.0f);
   }
 
   void completeSave() {
+
+    saving_thread.join();
+
     rewindAmount = 0.0f;
     nextFrame = minFrame;
 
@@ -123,7 +177,8 @@ static struct {
 
     if (!isFull()) {
       int pid = 0;
-      FILE *f = fopen("/var/lock/otto-fastcamd.pid", "r");
+      FILE *f = fopen("/var/run/otto-fastcamd.pid", "r");
+      // TODO(Wynter): need to signal that camera isn't running anymore!
       fscanf(f, "%d", &pid);
       fclose(f);
       kill( pid, SIGUSR1 );
@@ -208,8 +263,8 @@ static struct {
         drawSvg(iconRewind);
       }
       else {
-        fillColor(vec3(1));
-        fillText(std::to_string(frame + i));
+        fillColor( vec3(1) );
+        fillText( std::to_string(frame + i) );
       }
     }
   }
@@ -270,6 +325,9 @@ static struct {
 STAK_EXPORT int init() {
   loadFont(std::string(stak_assets_path()) + "232MKSD-round-medium.ttf");
   mode.init();
+
+  mkdir( "/mnt/tmp", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
+  mkdir( "/mnt/pictures", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
   return 0;
 }
 
