@@ -144,7 +144,7 @@ static struct {
     auto t = std::thread([] {
     static char system_call_string[1024];
       int file_number = get_next_file_number();
-      sprintf( system_call_string, "gifsicle --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*.gif", file_number );
+      sprintf( system_call_string, "gifsicle --loopcount --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*.gif", file_number );
 
       // run processing call
       system( system_call_string );
