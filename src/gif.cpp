@@ -72,6 +72,7 @@ int get_next_file_number() {
     dirp = opendir( "/mnt/pictures" );
     while ((dp = readdir(dirp)) != NULL) {
         char num_buffer[5];
+        num_buffer[4]=0;
         char * pos = strstr ( dp->d_name, ".gif" );
         int offset = (int) ( pos - dp->d_name );
         int len = strlen( dp->d_name );
