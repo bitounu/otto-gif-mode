@@ -115,6 +115,7 @@ static struct {
 
   void init() {
     iconRewind = loadSvg(std::string(stak_assets_path()) + "icon-rewind.svg", "px", 96);
+    system("rm /mnt/tmp/*.gif");
   }
 
   bool isFull() { return nextFrame > maxFrame; }
