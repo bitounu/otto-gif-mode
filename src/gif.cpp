@@ -150,6 +150,7 @@ static struct {
 
       // run processing call
       system( system_call_string );
+      system("/bin/systemctl restart otto-fastcamd");
     });
     saving_thread = std::move(t);
 
@@ -179,11 +180,21 @@ static struct {
 
     if (!isFull()) {
       int pid = 0;
+#if 0
       FILE *f = fopen("/var/run/otto-fastcamd.pid", "r");
+      if( f == nullptr ) {
+        system("/bin/systemctl restart otto-fastcamd");
+        f = fopen("/var/run/otto-fastcamd.pid", "r");
+        if( f == nullptr ) {
+          return;
+        }
+      }
       // TODO(Wynter): need to signal that camera isn't running anymore!
       fscanf(f, "%d", &pid);
       fclose(f);
       kill( pid, SIGUSR1 );
+#endif
+      if(system("/bin/systemctl kill otto-fastcamd -s SIGUSR1") != 0) return;
     }else{
       // NOTE(ryan): Bounce the meter to indicate the reel is full
       timeline.apply(&frameMeterValue)
