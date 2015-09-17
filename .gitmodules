@@ -1,6 +1,3 @@
-[submodule "deps/otto-gfx"]
-	path = deps/otto-gfx
-	url = git@github.com:NextThingCo/otto-gfx.git
 [submodule "deps/Choreograph"]
 	path = deps/Choreograph
 	url = https://github.com/sansumbrella/Choreograph.git
@@ -13,3 +10,6 @@
 [submodule "deps/otto-runner"]
 	path = deps/otto-runner
 	url = git@github.com:NextThingCo/otto-runner.git
+[submodule "deps/otto-gfx"]
+	path = deps/otto-gfx
+	url = git@github.com:NextThingCo/otto-gfx.git

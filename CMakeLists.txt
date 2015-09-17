@@ -13,6 +13,7 @@ set(ENTITYX_BUILD_SHARED OFF CACHE BOOL "No shared libs plz")
 set(CROSS_COMPILING ON) # Needed for EntityX's C++11 checks
 
 add_subdirectory(${ENTITYX})
+add_subdirectory(${OTTO_GFX})
 
 include_directories(
   deps/Choreograph/src
