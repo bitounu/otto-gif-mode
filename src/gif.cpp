@@ -69,7 +69,7 @@ int get_next_file_number() {
     struct dirent *dp;
     int highest_number = 0;
 
-    dirp = opendir( "/mnt/pictures" );
+    dirp = opendir("/mnt/pictures");
     while ((dp = readdir(dirp)) != NULL) {
         char num_buffer[5];
         num_buffer[4]=0;
@@ -115,6 +115,9 @@ static struct {
 
   void init() {
     iconRewind = loadSvg(std::string(stak_assets_path()) + "icon-rewind.svg", "px", 96);
+
+    nextFrame = 1;
+    setMeterFrame(nextFrame, true);
   }
 
   bool isFull() { return nextFrame > maxFrame; }
@@ -135,7 +138,6 @@ static struct {
   }
 
   void save() {
-
     timeline.apply(&captureScreenScale).then<RampTo>(0.0f, 0.15f, EaseInQuad());
     timeline.apply(&saveScreenScale)
         .then<Hold>(0.0f, 0.15f)
@@ -158,7 +160,6 @@ static struct {
   }
 
   void completeSave() {
-
     saving_thread.join();
 
     rewindAmount = 0.0f;
