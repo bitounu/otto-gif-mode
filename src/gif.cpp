@@ -20,8 +20,6 @@ using namespace choreograph;
 
 static Display display = { { 96.0f, 96.0f } };
 
-std::thread saving_thread;
-
 std::vector< std::string > getFilesInDirectory( std::string path, std::string match = "" ) {
   std::vector< std::string > files_in_directory;
   auto regex_filter = std::regex ( match );
@@ -113,11 +111,17 @@ static struct {
 
   Svg *iconRewind;
 
+  std::thread saving_thread;
+
   void init() {
     iconRewind = loadSvg(std::string(stak_assets_path()) + "icon-rewind.svg", "px", 96);
 
     nextFrame = 1;
     setMeterFrame(nextFrame, true);
+  }
+
+  void shutdown() {
+    if (saving_thread.joinable()) saving_thread.join();
   }
 
   bool isFull() { return nextFrame > maxFrame; }
@@ -144,8 +148,8 @@ static struct {
         .then<RampTo>(1.0f, 0.15f, EaseOutQuad());
 
     // TODO(ryan): Replace this with actual saving / GIF creation.
-    auto t = std::thread([] {
-    static char system_call_string[1024];
+    saving_thread = std::thread([] {
+      static char system_call_string[1024];
       int file_number = get_next_file_number();
       sprintf( system_call_string, "gifsicle --loopcount --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*.gif", file_number );
 
@@ -153,14 +157,12 @@ static struct {
       system( system_call_string );
       system("/bin/systemctl restart otto-fastcamd");
     });
-    saving_thread = std::move(t);
-
 
     timeline.cue([this] { completeSave(); }, 1.0f);
   }
 
   void completeSave() {
-    saving_thread.join();
+    if (saving_thread.joinable()) saving_thread.join();
 
     rewindAmount = 0.0f;
     nextFrame = minFrame;
