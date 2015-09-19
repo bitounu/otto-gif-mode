@@ -340,7 +340,7 @@ STAK_EXPORT int init() {
   mkdir( "/mnt/tmp", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
   mkdir( "/mnt/pictures", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
 
-  system("rm /mnt/tmp/*.gif");
+  system("rm -f /mnt/tmp/*.gif");
   system("systemctl start otto-fastcamd");
 
   mode.init();
