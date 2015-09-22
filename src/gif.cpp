@@ -115,9 +115,6 @@ static struct {
 
   void init() {
     iconRewind = loadSvg(std::string(stak_assets_path()) + "icon-rewind.svg", "px", 96);
-
-    nextFrame = 1;
-    setMeterFrame(nextFrame, true);
   }
 
   void shutdown() {
@@ -340,19 +337,25 @@ static struct {
 STAK_EXPORT int init() {
   loadFont(std::string(stak_assets_path()) + "232MKSD-round-medium.ttf");
 
-  mkdir( "/mnt/tmp", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
-  mkdir( "/mnt/pictures", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
+  mkdir("/mnt/tmp", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  mkdir("/mnt/pictures", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
   system("rm -f /mnt/tmp/*.gif");
-  system("systemctl start otto-fastcamd");
 
   mode.init();
 
   return 0;
 }
 
-STAK_EXPORT int shutdown() {
+STAK_EXPORT int activate() {
+  system("systemctl start otto-fastcamd");
+}
+
+STAK_EXPORT int deactivate() {
   system("systemctl stop otto-fastcamd");
+}
+
+STAK_EXPORT int shutdown() {
   return 0;
 }
 
