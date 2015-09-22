@@ -58,32 +58,15 @@ std::vector< std::string > getFilesInDirectory( std::string path, std::string ma
   return files_in_directory;
 }
 
-int startProcessingGifs() {
-  //auto gifs = getFilesInDirectory( "/mnt/tmp", ".*\.gif"R );
-  return 0;
-}
-int get_next_file_number() {
-    DIR *dirp;
-    struct dirent *dp;
-    int highest_number = 0;
-
-    dirp = opendir("/mnt/pictures");
-    while ((dp = readdir(dirp)) != NULL) {
-        char num_buffer[5];
-        num_buffer[4]=0;
-        char * pos = strstr ( dp->d_name, ".gif" );
-        int offset = (int) ( pos - dp->d_name );
-        int len = strlen( dp->d_name );
-        if ( ( pos ) &&
-             ( pos > dp->d_name + 4) &&
-             ( offset == ( len - 4 ) ) ) {
-            strncpy( num_buffer, pos - 4, 4 );
-            int number = atoi( num_buffer ) + 1;
-            if( number > highest_number ) highest_number = number;
-        }
+int getNextFileNumber() {
+  auto files = getFilesInDirectory("/mnt/pictures", "(\\.gif)|(\\.jpg)$");
+  int maxNum = 0;
+  for (const auto &file : files) {
+    if (file.length() >= 8) {
+      maxNum = std::max(maxNum, std::atoi(file.substr(file.size() - 8, 4).c_str()));
     }
-    closedir(dirp);
-    return highest_number;
+  }
+  return maxNum + 1;
 }
 
 static struct {
@@ -147,8 +130,8 @@ static struct {
     // TODO(ryan): Replace this with actual saving / GIF creation.
     saving_thread = std::thread([] {
       static char system_call_string[1024];
-      int file_number = get_next_file_number();
-      sprintf( system_call_string, "gifsicle --loopcount --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/gif_%04i.gif && rm /mnt/tmp/*.gif", file_number );
+      int file_number = getNextFileNumber();
+      sprintf( system_call_string, "gifsicle --loopcount --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/snap_%04i.gif && rm /mnt/tmp/*.gif", file_number );
 
       // run processing call
       system( system_call_string );
