@@ -7,6 +7,7 @@ set(OTTO_GFX    "deps/otto-gfx")
 set(OTTO_RUNNER "deps/otto-runner")
 set(OTTO_UTILS  "deps/otto-utils")
 set(ENTITYX     "deps/entityx")
+set(CPPFORMAT   "deps/cppformat")
 
 set(ENTITYX_DT_TYPE float)
 set(ENTITYX_BUILD_SHARED OFF CACHE BOOL "No shared libs plz")
@@ -20,13 +21,15 @@ include_directories(
   ${ENTITYX}
   ${OTTO_RUNNER}/src
   ${OTTO_UTILS}/src
+  ${CPPFORMAT}
   lib)
 
 include_directories(SYSTEM "${VC_SDK}/include") # VideoCore
 
 file(GLOB deps_src
   "deps/Choreograph/src/choreograph/*.cpp"
-  "deps/otto-utils/src/*.cpp")
+  "deps/otto-utils/src/*.cpp"
+  "${CPPFORMAT}/*.cc")
 file(GLOB src "src/*.cpp")
 
 set(mode_src ${deps_src} ${src})

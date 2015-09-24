@@ -13,3 +13,6 @@
 [submodule "deps/otto-gfx"]
 	path = deps/otto-gfx
 	url = git@github.com:NextThingCo/otto-gfx.git
+[submodule "deps/cppformat"]
+	path = deps/cppformat
+	url = https://github.com/cppformat/cppformat.git

@@ -4,6 +4,7 @@
 #include "timeline.hpp"
 #include "math.hpp"
 #include "draw.hpp"
+#include "format.h"
 
 #include <iostream>
 #include <string>
@@ -129,12 +130,8 @@ static struct {
 
     // TODO(ryan): Replace this with actual saving / GIF creation.
     saving_thread = std::thread([] {
-      static char system_call_string[1024];
       int file_number = getNextFileNumber();
-      sprintf( system_call_string, "gifsicle --loopcount --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/snap_%04i.gif && rm /mnt/tmp/*.gif", file_number );
-
-      // run processing call
-      system( system_call_string );
+      system(fmt::format("gifsicle --loopcount --colors 256 /mnt/tmp/*.gif -o /mnt/pictures/snap_{:04d}.gif && rm -f /mnt/tmp/*.gif", file_number).c_str());
       system("/bin/systemctl restart otto-fastcamd");
     });
 
@@ -161,8 +158,8 @@ static struct {
     static size_t colorIndex = 0;
 
     if (!isFull()) {
-      int pid = 0;
 #if 0
+      int pid = 0;
       FILE *f = fopen("/var/run/otto-fastcamd.pid", "r");
       if( f == nullptr ) {
         system("/bin/systemctl restart otto-fastcamd");
@@ -176,8 +173,10 @@ static struct {
       fclose(f);
       kill( pid, SIGUSR1 );
 #endif
-      if(system("/bin/systemctl kill otto-fastcamd -s SIGUSR1") != 0) return;
-    }else{
+      if (system("/bin/systemctl kill otto-fastcamd -s SIGUSR1") == 0) {
+        system(fmt::format("mv -f /mnt/tmp/tmp.gif /mnt/tmp/tmp_{:04d}.gif", nextFrame).c_str());
+      }
+    } else {
       // NOTE(ryan): Bounce the meter to indicate the reel is full
       timeline.apply(&frameMeterValue)
           .then<RampTo>(maxFrame + 1.15f, 0.1f, EaseOutQuad())
@@ -191,7 +190,7 @@ static struct {
     colorIndex = (colorIndex + 1) % 3;
     timeline.apply(&flashColor)
         .then<Hold>(flashColors[colorIndex], 0.0f)
-        .then<RampTo>(vec3(), 0.3f, EaseOutQuad());
+        .then<RampTo>(vec3(), 1.0f, EaseOutCubic());
   }
 
   void rewind(float amount) {
